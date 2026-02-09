@@ -153,6 +153,12 @@ internal class Program
                     }
                 }
 
+                if (programCounter > programData.Length - 1)
+                {
+                    Console.WriteLine("End of Program");
+                    break;
+                }
+
             }
 
 
@@ -410,7 +416,6 @@ internal class Program
         public static byte[] SystemInstructions = {0x00, 0x61, 0x6, 0x63, 0x64};
         public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
     }
-
 
     public class CPU
     {
