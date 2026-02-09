@@ -1,4 +1,6 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
+using System.Numerics;
 
 internal class Program
 {
@@ -56,14 +58,105 @@ internal class Program
 
             List<byte> tokenbytes = Tokenization.ConvertBytes(tokens); // Converts Tokens to their Byte versions
 
-            //Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
+            Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
 
             Filecontrol.filesaver(tokenbytes.ToArray());
         }
 
         void run() // runs a compiled .bin file
         {
-            
+            string filename = Filecontrol.fileloader(true);
+
+            byte[] programData = File.ReadAllBytes(filename); // Loads Bytes from .bin to array
+
+            Console.WriteLine("File Successfully loaded");
+
+            byte[] RAM = new byte[255]; // Ram for CPU
+
+            byte currentByte = 0x00;
+
+            byte regA = 0;
+            byte regB = 0;
+            byte regC = 0;
+            byte programCounter = 0;
+
+            Stack<byte> MainStack = new Stack<byte>(255);
+
+            //const int targetHz = 5;
+            //double targetPeriodMs = 1000.0 / targetHz;
+
+            //var stopwatch = Stopwatch.StartNew();
+            //long nextTick = stopwatch.ElapsedTicks;
+            //long ticksPerMs = Stopwatch.Frequency / 1000;
+
+            while (true)
+            {
+                //nextTick += (long)(targetPeriodMs * ticksPerMs); // calculates next tick time
+
+                currentByte = programData[programCounter];
+
+                if (Dictionaries.ArithmeticGateInstructions.Contains(currentByte))
+                {
+                    regC = CPU.ArithmeticLogic(currentByte, regA, regB);
+                    programCounter++;
+                    
+                } else if (Dictionaries.RegisterControlInstructions.Contains(currentByte))
+                {
+                    if (currentByte == 0x74)
+                    {
+                        programCounter = RAM[programData[programCounter + 1]];
+                    } else
+                    {
+                        switch (currentByte)
+                        {
+                            case 0x71:
+                                regA = RAM[programData[programCounter + 1]];
+                            break;
+                            case 0x72:
+                                regB = RAM[programData[programCounter + 1]];
+                            break;
+                            case 0x73:
+                                regC = RAM[programData[programCounter + 1]];
+                            break;
+                            case 0x75:
+                                RAM[programData[programCounter + 1]] = regA;
+                            break;
+                            case 0x76:
+                                RAM[programData[programCounter + 1]] = regB;
+                            break;
+                            case 0x77:
+                                RAM[programData[programCounter + 1]] = regC;
+                            break;
+                            case 0x78:
+                                RAM[programData[programCounter + 1]] = programCounter;
+                            break;
+                            case 0x79:
+                                regA = programData[programCounter + 1];
+                            break;
+                            case 0x7A:
+                                RAM[programData[programCounter + 1]] = (byte)MainStack.Count;
+                            break;
+                        }    
+                        programCounter++;
+                        programCounter++;
+                    }
+                    
+                } else if (Dictionaries.LogicalJumpInstructions.Contains(currentByte))
+                {
+                    byte newindex = CPU.LogicalJumpControl(programCounter, programData, regA, regB);
+                    if (newindex == 0xFF)
+                    {
+                        programCounter = (byte)(programCounter + 2);
+                    } else
+                    {
+                        programCounter = newindex;
+                    }
+                }
+
+            }
+
+
+
         }
 
         Console.ReadKey();
@@ -163,8 +256,6 @@ internal class Program
                 {
 
                     inputTokens.RemoveRange(definePosition, 2); // remove definition word
-
-                    definePosition--;
 
                     for (int i = 0; i < inputTokens.Count; i++)
                     {
@@ -311,5 +402,97 @@ internal class Program
             {0x79, 1},
             {0x7A, 1}
         };
+    
+        public static byte[] ArithmeticGateInstructions = {0x01, 0x02, 0x03, 0x04, 0x05, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2A}; // List of Simple Arithmetic and Logic gate Instruction codes
+        public static byte[] LogicalJumpInstructions = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A};
+        public static byte[] JumpInstructions = {0x41, 0x42, 0x43};
+        public static byte[] StackControlInstructions = {0x51, 0x52, 0x53, 0x54, 0x55, 0x56};
+        public static byte[] SystemInstructions = {0x00, 0x61, 0x6, 0x63, 0x64};
+        public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
+    }
+
+
+    public class CPU
+    {
+        public static byte ArithmeticLogic(byte Command, byte A, byte B)
+        {
+            switch (Command)
+            {
+                case 0x1:
+                    return (byte)(A + B);
+                case 0x2:
+                    return (byte)(A - B);
+                case 0x3:
+                    return (byte)(A * B);
+                case 0x4:
+                    return (byte)(A / B);
+                case 0x5:
+                    return (byte)(A % B);
+                case 0x21:
+                    return (byte)(A & B);
+                case 0x22:
+                    return (byte)(A | B);
+                case 0x23:
+                    return (byte)~(A & B);
+                case 0x24:
+                    return (byte)~(A | B);
+                case 0x25:
+                    return (byte)(A ^ B);
+                case 0x26:
+                    return (byte)(A << B);
+                case 0x27:
+                    return (byte)(A >> B);
+                case 0x28:
+                    return (byte)BitOperations.RotateLeft(A, B);
+                case 0x29:
+                    return (byte)BitOperations.RotateRight(A, B);
+                case 0x2A:
+                    return (byte)~A;
+            }
+            
+            return 0;
+        }
+    
+        public static byte LogicalJumpControl(byte index, byte[] Data, byte A, byte B)
+        {
+            byte Instruction = Data[index];
+            byte JumpPoint = Data[index+1];
+
+            switch (Instruction)
+            {
+                case 0x31:
+                    if (A < B) {return JumpPoint;}
+                break;
+                case 0x32:
+                    if (A <= B) {return JumpPoint;}
+                break;
+                case 0x33:
+                    if (A > B) {return JumpPoint;}
+                break;
+                case 0x34:
+                    if (A >= B) {return JumpPoint;}
+                break;
+                case 0x35:
+                    if (A == B) {return JumpPoint;}
+                break;
+                case 0x36:
+                    if (A != B) {return JumpPoint;}
+                break;
+                case 0x37:
+                    if (A > 0) {return JumpPoint;}
+                break;
+                case 0x38:
+                    if (A < 0) {return JumpPoint;}
+                break;
+                case 0x39:
+                    if (A == 0) {return JumpPoint;}
+                break;
+                case 0x3A:
+                    if (A != 0) {return JumpPoint;}
+                break;
+            }
+
+            return (byte)(index+1);
+        }
     }
 }
