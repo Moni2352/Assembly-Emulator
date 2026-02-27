@@ -1,6 +1,8 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Text;
+using System.Text.RegularExpressions;
 
 internal class Program
 {
@@ -55,6 +57,10 @@ internal class Program
             Console.WriteLine(string.Join(", ", tokens)); // debug print of all tokens
 
             tokens = Tokenization.DefineAddresser(tokens); // Looks through and scans for "Define: Word"
+
+            tokens = Tokenization.AddEndOfFileCharacter(tokens); // Does what is says
+
+            tokens = Tokenization.TextMover(tokens); // Moves text to be written after end of file and adds a link there
 
             List<byte> tokenbytes = Tokenization.ConvertBytes(tokens); // Converts Tokens to their Byte versions
 
@@ -137,8 +143,7 @@ internal class Program
                                 RAM[programData[programCounter + 1]] = (byte)MainStack.Count;
                             break;
                         }    
-                        programCounter++;
-                        programCounter++;
+                        programCounter = (byte)(programCounter + 2);
                     }
                     
                 } else if (Dictionaries.LogicalJumpInstructions.Contains(currentByte))
@@ -151,6 +156,21 @@ internal class Program
                     {
                         programCounter = newindex;
                     }
+                } else if (currentByte == 61)
+                {
+                    byte targetAddress = programData[programCounter + 1];
+                    byte currentAddress = targetAddress;
+                    string text = "";
+
+                    while (true)
+                    {
+                        byte currentData = programData[currentAddress];
+                        if (currentData == 0x00) {break;}
+                        text = $"{text}{Convert.ToString(currentData)}";
+                        currentAddress++;
+                    }
+
+                    Console.WriteLine(text);
                 }
 
                 if (programCounter > programData.Length - 1)
@@ -227,15 +247,23 @@ internal class Program
         public static List<string> Splitter (string[] fileLines)
         {
             List<string> tokenHolder = new List<string>();
+            Regex regex = new Regex(@"""([^""])""|(\S+)");
              foreach (string line in fileLines)
             {
                 string cleanline = line.Split("//")[0].Trim(); // removes comments and trims whitespace
 
                 if (string.IsNullOrEmpty(cleanline)) continue; // skip empty lines
 
-                string[] parts = cleanline.Split(new char[] { ' ', '\t'}, StringSplitOptions.RemoveEmptyEntries); // splits each line into tokens based on spaces and tabs
-
-                tokenHolder.AddRange(parts); // adds new tokens to the list
+                foreach (Match match in regex.Matches(cleanline))
+                {
+                    if (match.Groups[1].Success)
+                    {
+                        tokenHolder.Add(match.Groups[1].Value);
+                    } else
+                    {
+                        tokenHolder.Add(match.Groups[2].Value);
+                    }
+                }
             }
             return tokenHolder;
         }
@@ -277,12 +305,50 @@ internal class Program
             return inputTokens;
         }
 
+        public static List<string> AddEndOfFileCharacter(List<string> inputTokens)
+        {
+            inputTokens.Add("END");
+            return inputTokens;
+        }
+
+        public static List<string> TextMover(List<string> inputTokens)
+        {
+            List<string> returnList = inputTokens;
+
+            for (int i = 0; i < inputTokens.Count; i++)
+            {
+                if (inputTokens[i] == "END") {return returnList;}
+                
+                if (inputTokens[i] == "WRT")
+                {
+                    string text = inputTokens[i+1];
+                    byte[] bytes = Encoding.UTF8.GetBytes(text);
+                    Array.Resize(ref bytes, bytes.Length + 1);
+                    bytes[bytes.Length - 1] = 0x00;
+
+                    int index = returnList.Count;
+
+                    returnList[i+1] =  ((byte)index).ToString();
+
+                    List<string> bytestring = new List<string>();
+                    foreach (byte bytebit in bytes)
+                    {
+                       bytestring.Add(bytebit.ToString());   
+                    }
+
+                    returnList.AddRange(bytestring);
+                }
+            }
+            return returnList;
+        }
+
         public static List<byte> ConvertBytes(List<string> inputTokens)
         {
             List<byte> byteTokens = new List<byte>();
 
             foreach (string token in inputTokens)
             {
+
                 if (Dictionaries.EncoderDictionary.ContainsKey(token)) {byteTokens.Add(Dictionaries.EncoderDictionary[token]);}
 
                 if (token.Length == 4 && token.StartsWith("0x"))
@@ -292,6 +358,7 @@ internal class Program
                 {
                     byteTokens.Add(byte.Parse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture));
                 }
+                if (token == "END") {break;}
             }
             return byteTokens;
         }
@@ -351,7 +418,9 @@ internal class Program
             {"STC", 0X77},
             {"SPC", 0X78},
             {"LDI", 0X79},
-            {"SSC", 0X7A}
+            {"SSC", 0X7A},
+            {"END", 0x81},
+            {"VER", 0x82}
         };
     
         public static Dictionary<byte, int> ArgumentCount = new Dictionary<byte, int>()
@@ -415,6 +484,7 @@ internal class Program
         public static byte[] StackControlInstructions = {0x51, 0x52, 0x53, 0x54, 0x55, 0x56};
         public static byte[] SystemInstructions = {0x00, 0x61, 0x6, 0x63, 0x64};
         public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
+        public static byte[] SpecialInstructions = {0x81, 0x82};
     }
 
     public class CPU
