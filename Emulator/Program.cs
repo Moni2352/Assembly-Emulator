@@ -9,6 +9,7 @@ internal class Program
     [STAThread]
     private static void Main(string[] args)
     {
+        Stopwatch stopwatch = new();
         // Dictionaries of Hex commands and their purpose and command structure (# of bytes after for arguments)
 
         // Command Encoder Dictionary NAME, (HEX CODE, # OF ARGUMENT BYTES)
@@ -44,6 +45,8 @@ internal class Program
                 throw new FileNotFoundException("No file was selected for compilation.");
             }
 
+            stopwatch.Start();
+
             Console.WriteLine($"Compiling file: {filepath}");
 
             string[] Lines = File.ReadAllLines(filepath); // Grabs lines from given file and returns them as an array of lines in string format
@@ -66,6 +69,8 @@ internal class Program
 
             Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
 
+            stopwatch.Stop();
+            
             Filecontrol.filesaver(tokenbytes.ToArray());
         }
 
@@ -76,6 +81,8 @@ internal class Program
             byte[] programData = File.ReadAllBytes(filename); // Loads Bytes from .bin to array
 
             Console.WriteLine("File Successfully loaded");
+
+            stopwatch.Start();
 
             byte[] RAM = new byte[255]; // Ram for CPU
 
@@ -193,9 +200,10 @@ internal class Program
                     }
                 }
 
-                if (programCounter > programData.Length - 1)
+                if (currentByte == 0x81)
                 {
                     Console.WriteLine("End of Program");
+                    stopwatch.Stop();
                     break;
                 }
 
@@ -204,7 +212,7 @@ internal class Program
 
 
         }
-
+        Console.WriteLine($"{stopwatch.Elapsed.Microseconds.ToString()} Microseconds");
         Console.ReadKey();
     }
 
@@ -587,7 +595,7 @@ internal class Program
                 break;
             }
 
-            return (byte)(index+1);
+            return (byte)(index+2);
         }
     }
 }
