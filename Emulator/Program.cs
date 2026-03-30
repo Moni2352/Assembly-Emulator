@@ -156,7 +156,7 @@ internal class Program
                     {
                         programCounter = newindex;
                     }
-                } else if (currentByte == 61)
+                } else if (currentByte == 0x62) // Write to display
                 {
                     byte targetAddress = programData[programCounter + 1];
                     byte currentAddress = targetAddress;
@@ -170,7 +170,27 @@ internal class Program
                         currentAddress++;
                     }
 
+
                     Console.WriteLine(text);
+                    programCounter++;
+                } else if (Dictionaries.JumpInstructions.Contains(currentByte))
+                {
+                    int targetaddress;
+                    switch (currentByte)
+                    {  
+                        case 0x41:
+                        MainStack.Push((byte)(programCounter + 2));
+                        targetaddress = programData[programCounter + 1];
+                        programCounter = (byte)targetaddress;
+                        break;
+                        case 0x42:
+                        targetaddress = programData[programCounter + 1];
+                        programCounter = (byte)targetaddress;
+                        break;
+                        case 0x43:
+                        programCounter = MainStack.Pop();
+                        break;
+                    }
                 }
 
                 if (programCounter > programData.Length - 1)
@@ -247,7 +267,7 @@ internal class Program
         public static List<string> Splitter (string[] fileLines)
         {
             List<string> tokenHolder = new List<string>();
-            Regex regex = new Regex(@"""([^""])""|(\S+)");
+            Regex regex = new Regex(@"""([^""]*)""|(\S+)");
              foreach (string line in fileLines)
             {
                 string cleanline = line.Split("//")[0].Trim(); // removes comments and trims whitespace
@@ -482,7 +502,7 @@ internal class Program
         public static byte[] LogicalJumpInstructions = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A};
         public static byte[] JumpInstructions = {0x41, 0x42, 0x43};
         public static byte[] StackControlInstructions = {0x51, 0x52, 0x53, 0x54, 0x55, 0x56};
-        public static byte[] SystemInstructions = {0x00, 0x61, 0x6, 0x63, 0x64};
+        public static byte[] SystemInstructions = {0x00, 0x61, 0x62, 0x63, 0x64};
         public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
         public static byte[] SpecialInstructions = {0x81, 0x82};
     }
