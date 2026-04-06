@@ -45,7 +45,7 @@ internal partial class Program
                 throw new FileNotFoundException("No file was selected for compilation.");
             }
 
-            stopwatch.Start();
+            //stopwatch.Start();
 
             Console.WriteLine($"Compiling file: {filepath}");
 
@@ -59,19 +59,22 @@ internal partial class Program
 
             Console.WriteLine(string.Join(", ", tokens)); // debug print of all tokens
 
-            tokens = Tokenization.DefineAddresser(tokens); // Looks through and scans for "Define: Word"
+            List<string> dataTokens;
+            List<string> codeTokens;
 
-            tokens = Tokenization.AddEndOfFileCharacter(tokens); // Does what is says
+            (dataTokens, codeTokens) = Tokenization.SectionSplitter(tokens);
 
-            tokens = Tokenization.TextMover(tokens); // Moves text to be written after end of file and adds a link there
+            codeTokens = Tokenization.DefineAddresser(codeTokens); // Looks through and scans for "Define: Word"
 
-            List<byte> tokenbytes = Tokenization.ConvertBytes(tokens); // Converts Tokens to their Byte versions
+            codeTokens = Tokenization.AddEndOfFileCharacter(codeTokens); // Does what is says
 
-            Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
+            //List<byte> tokenbytes = Tokenization.ConvertBytes(tokens); // Converts Tokens to their Byte versions
 
-            stopwatch.Stop();
+            //Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
+
+            //stopwatch.Stop();
             
-            Filecontrol.filesaver(tokenbytes.ToArray());
+            //Filecontrol.filesaver(tokenbytes.ToArray());
         }
 
         void run() // runs a compiled .bin file
@@ -296,6 +299,18 @@ internal partial class Program
             return tokenHolder;
         }
     
+        public static (List<string>, List<string>) SectionSplitter (List<string> input)
+        {
+            if (!(input.Contains("_START") || input.Contains("_DATA"))) {Console.WriteLine("ERROR - SECTIONS NOT FOUND");}
+            int dataIndex = input.IndexOf("_START");
+            List<string> data = input.Take(dataIndex).ToList();
+            data.Remove("_DATA");
+            List<string> code = input.Skip(dataIndex).ToList();
+            code.Remove("_START");
+
+            return (data, code);
+        }
+
         public static List<string> DefineAddresser(List<string> inputTokens)
         {
             while (inputTokens.Contains("DEFINE:"))
@@ -339,35 +354,11 @@ internal partial class Program
             return inputTokens;
         }
 
-        public static List<string> TextMover(List<string> inputTokens)
+        public static List<string> DataMover (List<string> data, List<string> code)
         {
-            List<string> returnList = inputTokens;
+            //(INT, STRING) (NAME) (...DATA...)
 
-            for (int i = 0; i < inputTokens.Count; i++)
-            {
-                if (inputTokens[i] == "END") {return returnList;}
-                
-                if (inputTokens[i] == "WRT")
-                {
-                    string text = inputTokens[i+1];
-                    byte[] bytes = Encoding.UTF8.GetBytes(text);
-                    Array.Resize(ref bytes, bytes.Length + 1);
-                    bytes[bytes.Length - 1] = 0x00;
-
-                    int index = returnList.Count;
-
-                    returnList[i+1] =  ((byte)index).ToString();
-
-                    List<string> bytestring = new List<string>();
-                    foreach (byte bytebit in bytes)
-                    {
-                       bytestring.Add(bytebit.ToString());   
-                    }
-
-                    returnList.AddRange(bytestring);
-                }
-            }
-            return returnList;
+            return null;
         }
 
         public static List<byte> ConvertBytes(List<string> inputTokens)

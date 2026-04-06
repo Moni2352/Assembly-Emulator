@@ -121,5 +121,7 @@ internal partial class Program
         public static byte[] SystemInstructions = {0x00, 0x61, 0x62, 0x63, 0x64};
         public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
         public static byte[] SpecialInstructions = {0x81, 0x82};
+        public static string[] Sections = {"_DATA", "_START"};
+        public static string[] Datatypes = {"INT", "STRING"};
     }
 }
