@@ -68,9 +68,15 @@ internal partial class Program
 
             codeTokens = Tokenization.AddEndOfFileCharacter(codeTokens); // Does what is says
 
-            //List<byte> tokenbytes = Tokenization.ConvertBytes(tokens); // Converts Tokens to their Byte versions
+            List<string[]> Datasegments = Tokenization.DataSeperator(dataTokens);
 
-            //Console.WriteLine(string.Join(" ", tokenbytes.ToArray().Select(b => "0x" + b.ToString("X2"))));   // Debug display byte tokens
+            // Convert Data to bytes except for variable names (Convert to string version of bytes ie "0x03" and not 3)
+
+            // Prep Data Segment to be added (Convert to proper form Int to hex value, string to string of hex values with end character 0x03)
+
+            // Attach data segments and replace variable names with pointer to data
+
+            // Fully convert to Binary (convert string hex to actual hex)
 
             //stopwatch.Stop();
             
@@ -175,7 +181,7 @@ internal partial class Program
                     while (true)
                     {
                         byte currentData = programData[currentAddress];
-                        if (currentData == 0x00) {break;}
+                        if (currentData == 0x03) {break;}
                         text = $"{text}{Convert.ToString(currentData)}";
                         currentAddress++;
                     }
@@ -311,7 +317,7 @@ internal partial class Program
             return (data, code);
         }
 
-        public static List<string> DefineAddresser(List<string> inputTokens)
+        public static List<string> DefineAddresser (List<string> inputTokens)
         {
             while (inputTokens.Contains("DEFINE:"))
             {
@@ -348,7 +354,7 @@ internal partial class Program
             return inputTokens;
         }
 
-        public static List<string> AddEndOfFileCharacter(List<string> inputTokens)
+        public static List<string> AddEndOfFileCharacter (List<string> inputTokens)
         {
             inputTokens.Add("END");
             return inputTokens;
@@ -361,7 +367,7 @@ internal partial class Program
             return null;
         }
 
-        public static List<byte> ConvertBytes(List<string> inputTokens)
+        public static List<byte> ConvertBytes (List<string> inputTokens)
         {
             List<byte> byteTokens = new List<byte>();
 
@@ -380,6 +386,38 @@ internal partial class Program
                 if (token == "END") {break;}
             }
             return byteTokens;
+        }
+
+        public static List<string[]> DataSeperator (List<string> Tokens)
+        {
+            List<string[]> output = new();
+
+            for (int i = 0; i < Tokens.Count; i++)
+            {
+                if (Dictionaries.Datatypes.Contains(Tokens[i]))
+                {
+                    string[] outputstring = [Tokens[i+1], Tokens[i+2], Tokens[i]];
+                    output.Add(outputstring);
+                }
+            }
+            return output;
+        }
+    
+        public static List<string> CodeCombiner (List<string> CodeTokens, List<string[]> DataStrings) // Remake
+        {
+
+            List<string> outputTokens = CodeTokens;
+
+            foreach (string[] data in DataStrings)
+            {
+                if (!CodeTokens.Contains(data[0])) // Skips over data if code does not use that data
+                {
+                    continue;
+                }
+                
+
+
+            }
         }
     }  
 
