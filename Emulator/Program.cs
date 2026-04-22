@@ -68,11 +68,11 @@ internal partial class Program
 
             codeTokens = Tokenization.AddEndOfFileCharacter(codeTokens); // Does what is says
 
-            List<string[]> Datasegments = Tokenization.DataSeperator(dataTokens);
+            List<string[]> datasegments = Tokenization.DataSeperator(dataTokens);
 
-            // Convert Data to bytes except for variable names (Convert to string version of bytes ie "0x03" and not 3)
+            List<string> partialconvert = Tokenization.Step1Converter(codeTokens, datasegments); // Convert Data to bytes except for variable names (Convert to string version of bytes ie "0x03" and not 3)
 
-            // Prep Data Segment to be added (Convert to proper form Int to hex value, string to string of hex values with end character 0x03)
+            List<string[]> prepedData = Tokenization.DataPrepper(datasegments); // Prep Data Segment to be added (Convert to proper form Int to hex value, string to string of hex values with end character 0x03)
 
             // Attach data segments and replace variable names with pointer to data
 
@@ -158,6 +158,12 @@ internal partial class Program
                             case 0x7A:
                                 RAM[programData[programCounter + 1]] = (byte)MainStack.Count;
                             break;
+                            case 0x11:
+                                regA++;
+                            break;
+                            case 0x12:
+                                regA--;
+                            break;
                         }    
                         programCounter = (byte)(programCounter + 2);
                     }
@@ -182,7 +188,7 @@ internal partial class Program
                     {
                         byte currentData = programData[currentAddress];
                         if (currentData == 0x03) {break;}
-                        text = $"{text}{Convert.ToString(currentData)}";
+                        text += (char)currentData;
                         currentAddress++;
                     }
 
@@ -215,7 +221,6 @@ internal partial class Program
                     stopwatch.Stop();
                     break;
                 }
-
             }
 
 
@@ -350,6 +355,8 @@ internal partial class Program
                     }
                 }
             }  
+            
+            Console.WriteLine(string.Join(" ", inputTokens)); // DEBUG
 
             return inputTokens;
         }
@@ -362,7 +369,7 @@ internal partial class Program
 
         public static List<string> DataMover (List<string> data, List<string> code)
         {
-            //(INT, STRING) (NAME) (...DATA...)
+            //(TYPE) (NAME) (...DATA...)
 
             return null;
         }
@@ -396,28 +403,87 @@ internal partial class Program
             {
                 if (Dictionaries.Datatypes.Contains(Tokens[i]))
                 {
-                    string[] outputstring = [Tokens[i+1], Tokens[i+2], Tokens[i]];
+                    string[] outputstring = [Tokens[i+1], Tokens[i+2], Tokens[i]]; // (NAME) (DATA) (TYPE)
                     output.Add(outputstring);
                 }
             }
             return output;
         }
     
-        public static List<string> CodeCombiner (List<string> CodeTokens, List<string[]> DataStrings) // Remake
+        public static List<string> Step1Converter (List<string> CodeTokens, List<string[]> DataStrings)
         {
-
-            List<string> outputTokens = CodeTokens;
-
-            foreach (string[] data in DataStrings)
+            List<string> dataNames = new();
+            List<string> output = new();
+            
+            foreach (string[] array in DataStrings)
             {
-                if (!CodeTokens.Contains(data[0])) // Skips over data if code does not use that data
-                {
-                    continue;
-                }
-                
-
-
+                dataNames.Add(array[0]);
             }
+
+            for (int i = 0; i < CodeTokens.Count; i++)
+            {
+                string[] types = ["LDA", "LDB", "LDC", "STA", "STB", "STC", "LDI", "SPC", "LPC", "SSC"];
+                if (types.Contains(CodeTokens[i]))
+                {
+                    if (CodeTokens[i+1].StartsWith("0x") || dataNames.Contains(CodeTokens[i+1])) {continue;}
+                    CodeTokens[i+1] = $"0x{int.Parse(CodeTokens[i+1]):X2}";
+                }
+            }
+
+
+            for (int i = 0; i < CodeTokens.Count; i++)
+            {
+                if (dataNames.Contains(CodeTokens[i]))
+                {
+                    output.Add(CodeTokens[i]); // Adds variable names
+                }
+                else if (CodeTokens[i].StartsWith("0x"))
+                {
+                    output.Add(CodeTokens[i]); // Adds converted bytes
+                } 
+                else if (Dictionaries.EncoderDictionary.ContainsKey(CodeTokens[i]))
+                {
+                    output.Add($"0x{Dictionaries.EncoderDictionary[CodeTokens[i]]:X2}"); // Converts commands and adds them
+                }
+                else
+                {
+                    Console.WriteLine($"Error | {CodeTokens[i]} | Error in Step1Converter");
+                }
+            }
+
+            Console.WriteLine(string.Join(" ", output));
+            return output;
+        }
+
+        public static List<string[]> DataPrepper (List<string[]> DataStrings)
+        {
+            List<string[]> Output = new();
+
+            foreach (string[] array in DataStrings)
+            {
+                string Name = array[0];
+                string Data = array[1];
+                string Type = array[2];
+
+                List<string> output = new();
+
+                output.Add(Name);
+
+                if (Type == "INT")
+                {
+                    output.Add($"0x{int.Parse(Data):X2}");
+                    output.Add("0x03");
+                } else if (Type == "STRING")
+                {
+                    foreach (char character in Data)
+                    {
+                        output.Add($"0x{Convert.ToInt32(character):X2}");
+                    }
+                    output.Add("0x03");
+                }
+                Output.Add(output.ToArray());
+            }
+            return Output;
         }
     }  
 
