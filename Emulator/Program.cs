@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -45,7 +46,7 @@ internal partial class Program
                 throw new FileNotFoundException("No file was selected for compilation.");
             }
 
-            //stopwatch.Start();
+            stopwatch.Start();
 
             Console.WriteLine($"Compiling file: {filepath}");
 
@@ -68,19 +69,19 @@ internal partial class Program
 
             codeTokens = Tokenization.AddEndOfFileCharacter(codeTokens); // Does what is says
 
-            List<string[]> datasegments = Tokenization.DataSeperator(dataTokens);
+            List<DataContainer> datasegments = Tokenization.DataSeperator(dataTokens);
 
             List<string> partialconvert = Tokenization.Step1Converter(codeTokens, datasegments); // Convert Data to bytes except for variable names (Convert to string version of bytes ie "0x03" and not 3)
 
-            List<string[]> prepedData = Tokenization.DataPrepper(datasegments); // Prep Data Segment to be added (Convert to proper form Int to hex value, string to string of hex values with end character 0x03)
+            List<DataContainer> prepedData = Tokenization.DataPrepper(datasegments); // Prep Data Segment to be added (Convert to proper form Int to hex value, string to string of hex values with end character 0x03)
 
-            // Attach data segments and replace variable names with pointer to data
+            List<string> combinedhex = Tokenization.CombinedHex(prepedData, partialconvert); // Attach data segments and replace variable names with pointer to data
 
-            // Fully convert to Binary (convert string hex to actual hex)
+            byte[] convertedbytes = Tokenization.ConvertToByteArray(combinedhex); // Fully convert to Binary (convert string hex to actual hex)
 
-            //stopwatch.Stop();
+            stopwatch.Stop();
             
-            //Filecontrol.filesaver(tokenbytes.ToArray());
+            Filecontrol.filesaver(convertedbytes);
         }
 
         void run() // runs a compiled .bin file
@@ -160,9 +161,11 @@ internal partial class Program
                             break;
                             case 0x11:
                                 regA++;
+                                programCounter = (byte)(programCounter - 1);
                             break;
                             case 0x12:
                                 regA--;
+                                programCounter = (byte)(programCounter - 1);
                             break;
                         }    
                         programCounter = (byte)(programCounter + 2);
@@ -194,7 +197,7 @@ internal partial class Program
 
 
                     Console.WriteLine(text);
-                    programCounter++;
+                    programCounter = (byte)(programCounter + 2);
                 } else if (Dictionaries.JumpInstructions.Contains(currentByte))
                 {
                     int targetaddress;
@@ -230,6 +233,13 @@ internal partial class Program
         Console.ReadKey();
     }
 
+    public struct DataContainer
+    {
+        public string Name {get; set;}
+        public string Type {get; set;}
+        public string[] Data {get; set;}
+    }
+    
     public class Filecontrol
     {
         public static string fileloader(bool runnotcompile)
@@ -374,50 +384,35 @@ internal partial class Program
             return null;
         }
 
-        public static List<byte> ConvertBytes (List<string> inputTokens)
+        public static List<DataContainer> DataSeperator (List<string> Tokens)
         {
-            List<byte> byteTokens = new List<byte>();
-
-            foreach (string token in inputTokens)
-            {
-
-                if (Dictionaries.EncoderDictionary.ContainsKey(token)) {byteTokens.Add(Dictionaries.EncoderDictionary[token]);}
-
-                if (token.Length == 4 && token.StartsWith("0x"))
-                {
-                    byteTokens.Add(Byte.Parse(token[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-                } else if (token.Length == 2 && token != "PC")
-                {
-                    byteTokens.Add(byte.Parse(token, NumberStyles.HexNumber, CultureInfo.InvariantCulture));
-                }
-                if (token == "END") {break;}
-            }
-            return byteTokens;
-        }
-
-        public static List<string[]> DataSeperator (List<string> Tokens)
-        {
-            List<string[]> output = new();
+            List<DataContainer> output = new();
 
             for (int i = 0; i < Tokens.Count; i++)
             {
                 if (Dictionaries.Datatypes.Contains(Tokens[i]))
                 {
-                    string[] outputstring = [Tokens[i+1], Tokens[i+2], Tokens[i]]; // (NAME) (DATA) (TYPE)
-                    output.Add(outputstring);
+                    DataContainer container = new DataContainer()
+                    {
+                        Name = Tokens[i+1],
+                        Type = Tokens[i],
+                        Data = [Tokens[i+2]]
+                    };
+
+                    output.Add(container);
                 }
             }
             return output;
         }
     
-        public static List<string> Step1Converter (List<string> CodeTokens, List<string[]> DataStrings)
+        public static List<string> Step1Converter (List<string> CodeTokens, List<DataContainer> DataStrings)
         {
             List<string> dataNames = new();
             List<string> output = new();
             
-            foreach (string[] array in DataStrings)
+            foreach (DataContainer array in DataStrings)
             {
-                dataNames.Add(array[0]);
+                dataNames.Add(array.Name);
             }
 
             for (int i = 0; i < CodeTokens.Count; i++)
@@ -455,36 +450,75 @@ internal partial class Program
             return output;
         }
 
-        public static List<string[]> DataPrepper (List<string[]> DataStrings)
+        public static List<DataContainer> DataPrepper (List<DataContainer> DataStrings) // Processes Data strings into strings starting with name, type, and then the data in a hex format (0x01)
         {
-            List<string[]> Output = new();
+            List<DataContainer> Output = new();
 
-            foreach (string[] array in DataStrings)
+            foreach (DataContainer array in DataStrings)
             {
-                string Name = array[0];
-                string Data = array[1];
-                string Type = array[2];
+                string Data = array.Data[0];
 
-                List<string> output = new();
 
-                output.Add(Name);
-
-                if (Type == "INT")
+                DataContainer data = new DataContainer()
                 {
-                    output.Add($"0x{int.Parse(Data):X2}");
-                    output.Add("0x03");
-                } else if (Type == "STRING")
+                    Name = array.Name,
+                    Type = array.Type
+                };
+
+                List<string> datalist = new();
+
+                if (array.Type == "INT")
+                {
+                    datalist.Add($"0x{int.Parse(Data):X2}");
+                    datalist.Add("0x03");
+                } else if (array.Type == "STRING")
                 {
                     foreach (char character in Data)
                     {
-                        output.Add($"0x{Convert.ToInt32(character):X2}");
+                        datalist.Add($"0x{Convert.ToInt32(character):X2}");
                     }
-                    output.Add("0x03");
+                    datalist.Add("0x03");
                 }
-                Output.Add(output.ToArray());
+                data.Data = datalist.ToArray();
+                Output.Add(data);
             }
             return Output;
         }
+    
+        public static List<string> CombinedHex (List<DataContainer> PreparedData, List<string> PreparedCode)
+        {
+            List<string> OutputData = PreparedCode;
+
+            PreparedData.RemoveAll(container => !PreparedCode.Contains(container.Name)); // Removes data if the code does not include a reference
+
+            foreach (DataContainer container in PreparedData)
+            {
+                string indexstring = $"0x{OutputData.Count():X2}"; // Takes the length of the current output which is the index of the data and converts it to a hex string
+
+                OutputData.AddRange(container.Data); // Adds data to output
+
+                for (int i = 0; i < PreparedCode.Count(); i++) // Replaces all instances of the pointer name to the data index
+                {
+                    if (OutputData[i] == container.Name)
+                    {
+                        OutputData[i] = indexstring;
+                    }
+                }
+            }
+            return OutputData;
+        }
+
+        public static byte[] ConvertToByteArray (List<string> InputData)
+        {
+            List<byte> output = new();
+            foreach (string token in InputData)
+            {
+                byte bytedata = Convert.ToByte(token.Substring(2), 16);
+                output.Add(bytedata);
+            }
+            byte[] trueoutput = output.ToArray();
+            return trueoutput;
+        } 
     }  
 
     public class CPU
