@@ -45,6 +45,7 @@ internal partial class Program
             {"WRT", 0X62},
             {"HALT", 0X63},
             {"ERR", 0X64},
+            {"OUT", 0x65},
             {"LDA", 0X71},
             {"LDB", 0X72},
             {"LDC", 0X73},
@@ -102,6 +103,7 @@ internal partial class Program
             {0x62, 0},
             {0x63, 0},
             {0x64, 0},
+            {0x65, 0},
             {0x71, 1},
             {0x72, 1},
             {0x73, 1},
@@ -118,7 +120,7 @@ internal partial class Program
         public static byte[] LogicalJumpInstructions = {0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3A};
         public static byte[] JumpInstructions = {0x41, 0x42, 0x43};
         public static byte[] StackControlInstructions = {0x51, 0x52, 0x53, 0x54, 0x55, 0x56};
-        public static byte[] SystemInstructions = {0x00, 0x61, 0x62, 0x63, 0x64};
+        public static byte[] SystemInstructions = {0x00, 0x61, 0x62, 0x63, 0x64, 0x65};
         public static byte[] RegisterControlInstructions = {0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A, 0x11, 0x12};
         public static byte[] SpecialInstructions = {0x81, 0x82};
         public static string[] Sections = {"_DATA", "_START"};

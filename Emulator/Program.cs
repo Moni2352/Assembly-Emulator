@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.ComponentModel;
+using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
@@ -181,23 +182,29 @@ internal partial class Program
                     {
                         programCounter = newindex;
                     }
-                } else if (currentByte == 0x62) // Write to display
+                } else if (Dictionaries.SystemInstructions.Contains(currentByte))
                 {
-                    byte targetAddress = programData[programCounter + 1];
-                    byte currentAddress = targetAddress;
-                    string text = "";
-
-                    while (true)
+                    if (currentByte == 0x62) // Write to display
                     {
-                        byte currentData = programData[currentAddress];
-                        if (currentData == 0x03) {break;}
-                        text += (char)currentData;
-                        currentAddress++;
+                        byte targetAddress = programData[programCounter + 1];
+                        byte currentAddress = targetAddress;
+                        string text = "";
+                        while (true)
+                        {
+                            byte currentData = programData[currentAddress];
+                            if (currentData == 0x03) {break;}
+                            text += (char)currentData;
+                            currentAddress++;
+                        }
+                        Console.WriteLine(text);
+                        programCounter = (byte)(programCounter + 2);
+                    } else if (currentByte == 0x65) // Output Register A 
+                    {
+                        int displayint = regA;
+                        Console.WriteLine(displayint.ToString());
+                        programCounter = (byte)(programCounter + 1);
+                        //=======================================
                     }
-
-
-                    Console.WriteLine(text);
-                    programCounter = (byte)(programCounter + 2);
                 } else if (Dictionaries.JumpInstructions.Contains(currentByte))
                 {
                     int targetaddress;
